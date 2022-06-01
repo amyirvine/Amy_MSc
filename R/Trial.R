@@ -17,6 +17,9 @@ library(mapview)
 library(magrittr)
 library(rgdal)
 
+#BASIC loading to get all the info ----
+load("./FISH_TST/META_MASTER_TAX_SPID_FISH_2FEB2021.Rdata") # META of all fish
+
 #import geographical database layers
 geo <- read.csv("~/Dropbox/FOME_DATA/GEOGRAPHICAL_LAYER/GEO_SPATIAL_META_MOL720GRID_V5.csv", header=TRUE)
 View(geo)
@@ -39,8 +42,8 @@ AtlanticTuna <- read.csv(unzip("~/Dropbox/FOME_DATA/FINAL_SDM_RANGE_V4.zip", "FI
 combined_AtCod <- merge(AtlanticCod, geo, by.x="INDEX", by.y="row.names")
 combined_AtTun <- merge(AtlanticTuna, geo, by.x="INDEX", by.y="row.names")
 
-AtCodcoords <- st_as_sf(combined_AtCod, coords = c("longitude","latitude"), crs = 4326, remove = FALSE)
-AtTuncoords <- st_as_sf(combined_AtTun, coords = c("longitude","latitude"), crs = 4326, remove = FALSE)
+AtCodcoords <- st_as_sf(combined_AtCod, coords = c("longitude","latitude"), crs = "+proj=longlat +datum=WGS84 +no_defs", remove = FALSE)
+AtTuncoords <- st_as_sf(combined_AtTun, coords = c("longitude","latitude"), crs = "+proj=longlat +datum=WGS84 +no_defs", remove = FALSE)
 
 CodTuna <- st_join(AtCodcoords, AtTuncoords)
 #Derek says use st_intersects()
@@ -59,12 +62,13 @@ world <- ne_countries(scale = "medium", returnclass = "sf") %>% #world data
   maritime_bounds <- st_read("~/Documents/MSC_Thesis/ScotianShelf_BayOfFundy_Bioregion/MaritimesPlanningArea.shp")
 #equivalent to Kristina's bounding box
 maritime_bounds_WGS84 <- st_transform(maritime_bounds,"+proj=longlat +datum=WGS84 +no_defs")
+
 GEO2 <- st_as_sf(GEO, coords = c("longitude","latitude"), crs = "+proj=longlat +datum=WGS84 +no_defs", remove = FALSE)
 
 intersection1 <- st_intersection(grid, maritime_bounds_WGS84)
 
 
-#PLOT
+#PLOT maritime area and grid cells that overlap with it
 ggplot() + geom_polygon(data = maritime_area, aes(x = long, y = lat, group = group), colour = "black", fill = NA) + 
  geom_point(data = intersection1, aes(x = X_COORD, y = Y_COORD), colour = "red", fill = NA)
 
@@ -72,34 +76,51 @@ ggplot() + geom_polygon(data = maritime_area, aes(x = long, y = lat, group = gro
 combo <- st_join(grid, CodTuna) #both need to be sf format as join is performed spatially
 rast <- st_rasterize(combo %>% dplyr::select(HSI.x, geometry)) #rasterize for easier plotting
 
+# 7. GRAPH ----
+#plot using the tmap package
+tmap_mode("plot") #set to plotting
+data("World") #grab data set
+map <- tm_shape(World) + "bbox = maritime_bounds_WGS84" +
+  tm_grid(lines=FALSE) + #include ticks but no grid
+  tm_polygons() +
+  tm_borders("grey") +
+  tm_layout(inner.margins = 0) + #remove margins in frame
+  tm_shape(rast) +
+  tm_raster(col="HSI",
+            n=10, #number of breaks for legend
+            title="HSI", 
+            palette = "Blues") +
+  tm_layout(main.title="Thunnus albacares",
+            legend.outside = TRUE, #place legend outside of map
+            legend.outside.position=c("right", "top"),
+            legend.outside.size = 0.2) #remove some white space next to legend
+map
+
+#MG - GGplot 
+
+ggplot() +
+  theme_minimal()+
+  #add axes info
+  
+  geom_stars(data = rast)+
+  scale_fill_cmocean("HSI", name = "matter", na.value="white") +
+  geom_sf(data = World, fill = "coral",
+          colour = "white", size = 0.2)+ 
+  
+  
+  labs(title = "Thunnus albacares") +
+  ggeasy::easy_center_title()+
+  xlab("Longitude") + # for the x axis label
+  ylab("Latitude")
 
 
-#KRISTINA'S CODE
+# 8. SAVE map ----
+tmap_save(map, "Thunnus albacares.png", asp=0)
 
-id <- META %>%
-  filter(AcceptedSciName == "Thunnus albacares") %>%
-  select("SPID") 
-id
+# save as PDF
+filename <- "./Figure_X.pdf"
+ggsave(plot = map, filename = filename, width = 10, height = 10)
 
-#EXTRACT file with the SPID number from FINAL_SDM_RANGE_V4.zip (DOWNLOADED FOR EASIER ACCESS) ----
-#get file from local location and unzip
-file <- ("~/Dropbox/FOME_DATA/FINAL_SDM_RANGE_V4.zip")
-file_names <- unzip(file, list=TRUE) # list zip archive to check on file names if needed
-#using readr unzip and set header and separator
-#REPLACE SPID AT END OF FILE NAME
-species <- read.csv(unzip("FINAL_SDM_RANGE_V4.zip", "FINAL_SDM_RANGE_V4/FINAL_SDM_RANGE_V4_SPID_11180.csv"), header = TRUE, sep=";")
-
-# 4. MATCH to GEO_SPATIAL_META ----
-#INDEX in species file corresponds to line number of the Geographical MASTER data
-#merge files by INDEX and row.names
-combined_df <- merge(species, geo, by.x="INDEX", by.y="row.names")
-
-#convert row names to column as row.names=1 doesn't work for some shitty reason
-#geo$INDEX_geo <- row.names(geo)
-#combined_df <- merge(species, geo, by.x="INDEX", by.y="INDEX_geo")
-
-# 5. WRITE output as csv ----
-write.csv(combined_df, "Thunnus albacares.csv", row.names=FALSE)
 
 
 
