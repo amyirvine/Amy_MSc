@@ -24,31 +24,6 @@ load("./FISH_TST/META_MASTER_TAX_SPID_FISH_2FEB2021.Rdata") # META of all fish
 geo <- read.csv("~/Dropbox/FOME_DATA/GEOGRAPHICAL_LAYER/GEO_SPATIAL_META_MOL720GRID_V5.csv", header=TRUE)
 View(geo)
 
-#KRISTINA CODE - import list of species 
-file <- "~/Dropbox/FOME_DATA/FINAL_SDM_RANGE_V4.zip"
-file_names <- unzip(file, list=TRUE) # list zip archive to check on file names if needed
-
-#DEREK CODE - Different way to read in file paths 
-file_paths <- fs::dir_ls("~/Dropbox/FOME_DATA/FISH_TST/FINAL_SDM_RANGE_V4")
-file_paths
-
-#using readr unzip and set header and separator
-#REPLACE SPID NUMBER AT END OF FILE NAME
-#Here I import cod
-AtlanticCod <- read.csv(unzip("~/Dropbox/FOME_DATA/FINAL_SDM_RANGE_V4.zip", "FINAL_SDM_RANGE_V4/FINAL_SDM_RANGE_V4_SPID_2113.csv"), header = TRUE, sep=";")
-AtlanticTuna <- read.csv(unzip("~/Dropbox/FOME_DATA/FINAL_SDM_RANGE_V4.zip", "FINAL_SDM_RANGE_V4/FINAL_SDM_RANGE_V4_SPID_11180.csv"), header = TRUE, sep=";")
-
-#combine Atlantic Cod and Tuna with geo file
-combined_AtCod <- merge(AtlanticCod, geo, by.x="INDEX", by.y="row.names")
-combined_AtTun <- merge(AtlanticTuna, geo, by.x="INDEX", by.y="row.names")
-
-AtCodcoords <- st_as_sf(combined_AtCod, coords = c("longitude","latitude"), crs = "+proj=longlat +datum=WGS84 +no_defs", remove = FALSE)
-AtTuncoords <- st_as_sf(combined_AtTun, coords = c("longitude","latitude"), crs = "+proj=longlat +datum=WGS84 +no_defs", remove = FALSE)
-
-CodTuna <- st_join(AtCodcoords, AtTuncoords)
-#Derek says use st_intersects()
-#this seems wrong because the output is off
-
 #mapping shapefile
 maritime_area <- readOGR("~/Documents/MSC_Thesis/ScotianShelf_BayOfFundy_Bioregion/MaritimesPlanningArea.shp")
 GEO <- readOGR("~/Dropbox/FOME_DATA/720 x 228 grid GIS INFO/720x228global.shp")
@@ -65,18 +40,77 @@ maritime_bounds_WGS84 <- st_transform(maritime_bounds,"+proj=longlat +datum=WGS8
 
 GEO2 <- st_as_sf(GEO, coords = c("longitude","latitude"), crs = "+proj=longlat +datum=WGS84 +no_defs", remove = FALSE)
 
-intersection1 <- st_intersection(grid, maritime_bounds_WGS84)
+MaritimeGrid <- st_intersection(grid, maritime_bounds_WGS84)
 
 
 #PLOT maritime area and grid cells that overlap with it
 ggplot() + geom_polygon(data = maritime_area, aes(x = long, y = lat, group = group), colour = "black", fill = NA) + 
- geom_point(data = intersection1, aes(x = X_COORD, y = Y_COORD), colour = "red", fill = NA)
+ geom_point(data = MaritimeGrid, aes(x = X_COORD, y = Y_COORD), colour = "red", fill = NA)
+
+#Trying to save the grid cells that fit within the maritime region as a function
+maritimeboundary_function <- function(MaritimeGrid) {
+  
+  
+}
 
 
-combo <- st_join(grid, CodTuna) #both need to be sf format as join is performed spatially
-rast <- st_rasterize(combo %>% dplyr::select(HSI.x, geometry)) #rasterize for easier plotting
+#Reading species presence into isolated area of Maritime Region ----
+#KRISTINA CODE - import list of species
+file <- "~/Dropbox/FOME_DATA/FINAL_SDM_RANGE_V4.zip"
+file_names <- unzip(file, list=TRUE) # list zip archive to check on file names if needed
 
-# 7. GRAPH ----
+#DEREK CODE - Different way to read in file paths 
+file_paths <- fs::dir_ls("~/Dropbox/FOME_DATA/FISH_TST/FINAL_SDM_RANGE_V4")
+file_paths
+
+#using readr unzip and set header and separator
+#REPLACE SPID NUMBER AT END OF FILE NAME
+#Here I import cod & tuna
+AtlanticCod <- read.csv(unzip("~/Dropbox/FOME_DATA/FINAL_SDM_RANGE_V4.zip", "FINAL_SDM_RANGE_V4/FINAL_SDM_RANGE_V4_SPID_2113.csv"), header = TRUE, sep=";")
+AtlanticTuna <- read.csv(unzip("~/Dropbox/FOME_DATA/FINAL_SDM_RANGE_V4.zip", "FINAL_SDM_RANGE_V4/FINAL_SDM_RANGE_V4_SPID_11180.csv"), header = TRUE, sep=";")
+
+#Only looking at Binary so need to make that column categorical
+AtlanticCod$BINARY <- ordered(AtlanticCod$BINARY, levels = 0:1)
+str(AtlanticCod)
+
+AtlanticTuna$BINARY <- ordered(AtlanticTuna$BINARY, levels = 0:1)
+str(AtlanticTuna)
+
+#combine Atlantic Cod and Tuna with geo file
+combined_AtCod <- merge(AtlanticCod, geo, by.x="INDEX", by.y="row.names")
+combined_AtTun <- merge(AtlanticTuna, geo, by.x="INDEX", by.y="row.names")
+
+AtCodcoords <- st_as_sf(combined_AtCod, coords = c("longitude","latitude"), crs = "+proj=longlat +datum=WGS84 +no_defs", remove = FALSE)
+AtTuncoords <- st_as_sf(combined_AtTun, coords = c("longitude","latitude"), crs = "+proj=longlat +datum=WGS84 +no_defs", remove = FALSE)
+#don't join the species but rather see if they are present and if present, add to a list
+
+combo <- st_join(grid, AtCodcoords) #both need to be sf format as join is performed spatially
+rast <- st_rasterize(combo %>% dplyr::select(BINARY, geometry)) #rasterize for easier plotting
+
+MaritimeCod <- st_intersection(MaritimeGrid, combo)
+
+ggplot() + geom_polygon(data = maritime_area, aes(x = long, y = lat, group = group), colour = "black", fill = NA) + 
+  geom_point(data = MaritimeCod, aes(x = X_COORD, y = Y_COORD), colour = "red", fill = NA)
+
+
+#Matthew GGplot - Richness ----
+#data("World") #grab data set
+world <- ne_countries(scale = "medium", returnclass = "sf") %>% #world data
+  st_transform(crs = "+proj=longlat +datum=WGS84 +no_defs")
+ggplot() +
+  theme_minimal()+
+  #add axes info
+  geom_stars(data = rast)+
+  scale_fill_cmocean("Binary", name = "dense", na.value="white", discrete = TRUE) +
+  geom_sf(data = world, fill = "coral",
+          colour = "white", size = 0.2)+
+  labs(title = "Tuna") +
+  ggeasy::easy_center_title()+
+  xlab("Longitude") + # for the x axis label
+  ylab("Latitude")
+
+
+#Kristina tmap plotting ----
 #plot using the tmap package
 tmap_mode("plot") #set to plotting
 data("World") #grab data set
@@ -114,8 +148,9 @@ ggplot() +
   ylab("Latitude")
 
 
+
 # 8. SAVE map ----
-tmap_save(map, "Thunnus albacares.png", asp=0)
+tmap_save(map, "Gadus morhua.png", asp=0)
 
 # save as PDF
 filename <- "./Figure_X.pdf"
