@@ -9,13 +9,15 @@ library(rnaturalearth)
 library(dplyr)
 library(tidyverse)
 library(spData)
-library(tmap)
 library(raster)
 library(rnaturalearthdata)
 library(stars)
 library(mapview)
 library(magrittr)
 library(rgdal)
+
+#setwd("C:/Users/Kristina at work/Dropbox/FOME_DATA")
+setwd("~/Dropbox/FOME_DATA")
 
 #BASIC loading to get all the info ----
 load("./FISH_TST/META_MASTER_TAX_SPID_FISH_2FEB2021.Rdata") # META of all fish
@@ -26,19 +28,19 @@ View(geo)
 
 #mapping shapefile
 maritime_area <- readOGR("~/Documents/MSC_Thesis/ScotianShelf_BayOfFundy_Bioregion/MaritimesPlanningArea.shp")
-GEO <- readOGR("~/Dropbox/FOME_DATA/720 x 228 grid GIS INFO/720x228global.shp")
-#reads as spatial polygon - do we need to readOGR first?
+GEO <- readOGR("~/Dropbox/FOME_DATA/720 x 228 grid GIS INFO/720x228global.shp") %>%
+  st_as_sf(GEO, coords = c("longitude","latitude"), crs = "+proj=longlat +datum=WGS84 +no_defs", remove = FALSE)
+
 
 grid <- st_read("~/Dropbox/FOME_DATA/720 x 228 grid GIS INFO/720x228global.shp") #grid data
 #reads as 164160 observations of 19 variables
 
-world <- ne_countries(scale = "medium", returnclass = "sf") %>% #world data
+world <- ne_countries(scale = "medium", returnclass = "sf") %>%
+  st_transform(crs = "+proj=longlat +datum=WGS84 +no_defs") #world data
 
-  maritime_bounds <- st_read("~/Documents/MSC_Thesis/ScotianShelf_BayOfFundy_Bioregion/MaritimesPlanningArea.shp")
+maritime_bounds <- st_read("~/Documents/MSC_Thesis/ScotianShelf_BayOfFundy_Bioregion/MaritimesPlanningArea.shp")
 #equivalent to Kristina's bounding box
 maritime_bounds_WGS84 <- st_transform(maritime_bounds,"+proj=longlat +datum=WGS84 +no_defs")
-
-GEO2 <- st_as_sf(GEO, coords = c("longitude","latitude"), crs = "+proj=longlat +datum=WGS84 +no_defs", remove = FALSE)
 
 MaritimeGrid <- st_intersection(grid, maritime_bounds_WGS84)
 
@@ -48,9 +50,18 @@ ggplot() + geom_polygon(data = maritime_area, aes(x = long, y = lat, group = gro
  geom_point(data = MaritimeGrid, aes(x = X_COORD, y = Y_COORD), colour = "red", fill = NA)
 
 #Trying to save the grid cells that fit within the maritime region as a function
-maritimeboundary_function <- function(MaritimeGrid) {
+###PRACTICE BUT NOT USING YET###
+spatial_isolation_function <- function(MaritimeGrid) {
+  grid <- st_read("~/Dropbox/FOME_DATA/720 x 228 grid GIS INFO/720x228global.shp") #grid data
+  maritime_bounds <- st_read("~/Documents/MSC_Thesis/ScotianShelf_BayOfFundy_Bioregion/MaritimesPlanningArea.shp")
+  #equivalent to Kristina's bounding box
+  maritime_bounds_WGS84 <- st_transform(maritime_bounds,"+proj=longlat +datum=WGS84 +no_defs")
+  
+  MaritimeGrid <- st_intersection(grid, maritime_bounds_WGS84)
   
   
+  output_value <- do_something(MaritimeGrid)
+  return(output)
 }
 
 
@@ -87,7 +98,29 @@ AtTuncoords <- st_as_sf(combined_AtTun, coords = c("longitude","latitude"), crs 
 combo <- st_join(grid, AtCodcoords) #both need to be sf format as join is performed spatially
 rast <- st_rasterize(combo %>% dplyr::select(BINARY, geometry)) #rasterize for easier plotting
 
-MaritimeCod <- st_intersection(MaritimeGrid, combo)
+MaritimeCod <- st_intersects(maritime_bounds_WGS84, combo) #causes R program to reboot
+class(MaritimeCod)
+
+
+philly_sel_sf <- combo[MaritimeCod[[1]],]
+
+ggplot() + geom_polygon(data = maritime_area, aes(x = long, y = lat, group = group), colour = "black", fill = NA) + 
+  geom_point(data = MaritimeCod, aes(x = X_COORD, y = Y_COORD), colour = "red", fill = NA)
+
+#Practice
+combo$BINARY <- (na.omit(combo$BINARY))
+
+
+
+mydata$y = ifelse(mydata$x3 %in% c("A","B") ,mydata$x1*2,
+                  ifelse(mydata$x3 %in% c("C","D"), mydata$x1*3,
+                         mydata$x1*4))
+
+
+
+ifelse(combo$BINARY %in% c("0","1"), transmute(combo, species_pres = 2113))
+transmute(combo, species_pres = ifelse(BINARY %in% c("0","1"), "Present", )))
+
 
 ggplot() + geom_polygon(data = maritime_area, aes(x = long, y = lat, group = group), colour = "black", fill = NA) + 
   geom_point(data = MaritimeCod, aes(x = X_COORD, y = Y_COORD), colour = "red", fill = NA)
@@ -95,6 +128,7 @@ ggplot() + geom_polygon(data = maritime_area, aes(x = long, y = lat, group = gro
 
 #Matthew GGplot - Richness ----
 #data("World") #grab data set
+library(cmocean)
 world <- ne_countries(scale = "medium", returnclass = "sf") %>% #world data
   st_transform(crs = "+proj=longlat +datum=WGS84 +no_defs")
 ggplot() +
