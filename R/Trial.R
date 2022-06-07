@@ -47,7 +47,9 @@ MaritimeGrid <- st_intersection(grid, maritime_bounds_WGS84)
 
 #PLOT maritime area and grid cells that overlap with it
 ggplot() + geom_polygon(data = maritime_area, aes(x = long, y = lat, group = group), colour = "black", fill = NA) + 
- geom_point(data = MaritimeGrid, aes(x = X_COORD, y = Y_COORD), colour = "red", fill = NA)
+ geom_point(data = MaritimeGrid, aes(x = X_COORD, y = Y_COORD), colour = "red", fill = NA)+
+  labs(title = "Maritime Grid")+
+  ggeasy::easy_center_title()
 
 #Trying to save the grid cells that fit within the maritime region as a function
 ###PRACTICE BUT NOT USING YET###
@@ -58,10 +60,9 @@ spatial_isolation_function <- function(MaritimeGrid) {
   maritime_bounds_WGS84 <- st_transform(maritime_bounds,"+proj=longlat +datum=WGS84 +no_defs")
   
   MaritimeGrid <- st_intersection(grid, maritime_bounds_WGS84)
-  
-  
-  output_value <- do_something(MaritimeGrid)
-  return(output)
+  MaritimeGrid_map <- ggplot() + geom_polygon(data = maritime_area, aes(x = long, y = lat, group = group), colour = "black", fill = NA) + 
+    geom_point(data = MaritimeGrid, aes(x = X_COORD, y = Y_COORD), colour = "red", fill = NA)
+  return(MaritimeGrid_map)
 }
 
 
@@ -101,11 +102,46 @@ rast <- st_rasterize(combo %>% dplyr::select(BINARY, geometry)) #rasterize for e
 MaritimeCod <- st_intersects(maritime_bounds_WGS84, combo) #causes R program to reboot
 class(MaritimeCod)
 
-
-philly_sel_sf <- combo[MaritimeCod[[1]],]
+#is this right? looking at only the 1 value
+MaritimeCod_present <- combo[MaritimeCod[[1]],]
+class(MaritimeCod_present)
 
 ggplot() + geom_polygon(data = maritime_area, aes(x = long, y = lat, group = group), colour = "black", fill = NA) + 
-  geom_point(data = MaritimeCod, aes(x = X_COORD, y = Y_COORD), colour = "red", fill = NA)
+  geom_point(data = MaritimeCod_present, aes(x = X_COORD, y = Y_COORD), colour = "red", fill = NA) +
+  labs(title = "Maritime Cod")+
+  ggeasy::easy_center_title()
+
+###PRACTICING WITH A SPECIES NOT IN NW ATLANTIC TO SEE IF IT WORKS####
+## Rainbow parrotfish = Scarus guacamaia = SPID 10817
+RainbowParrot <- read.csv(unzip("~/Dropbox/FOME_DATA/FINAL_SDM_RANGE_V4.zip", "FINAL_SDM_RANGE_V4/FINAL_SDM_RANGE_V4_SPID_10817.csv"), header = TRUE, sep=";")
+
+
+#Only looking at Binary so need to make that column categorical
+RainbowParrot$BINARY <- ordered(RainbowParrot$BINARY, levels = 0:1)
+str(RainbowParrot)
+
+#combine Atlantic Cod and Tuna with geo file
+combined_RainbowParrot <- merge(RainbowParrot, geo, by.x="INDEX", by.y="row.names")
+
+RbParrotcoords <- st_as_sf(combined_RainbowParrot, coords = c("longitude","latitude"), crs = "+proj=longlat +datum=WGS84 +no_defs", remove = FALSE)
+#don't join the species but rather see if they are present and if present, add to a list
+
+comboRbParrot <- st_join(grid, RbParrotcoords) #both need to be sf format as join is performed spatially
+rast <- st_rasterize(comboRbParrot %>% dplyr::select(BINARY, geometry)) #rasterize for easier plotting
+
+MaritimeRbParrot <- st_intersects(maritime_bounds_WGS84, comboRbParrot) #causes R program to reboot
+class(MaritimeRbParrot)
+
+#is this right? looking at only the 1 value
+MaritimeRbParrot_present <- combo[MaritimeRbParrot[[1]],]
+class(MaritimeRbParrot_present)
+
+ggplot() + geom_polygon(data = maritime_area, aes(x = long, y = lat, group = group), colour = "black", fill = NA) + 
+  geom_point(data = MaritimeRbParrot_present, aes(x = X_COORD, y = Y_COORD), colour = "red", fill = NA) +
+  labs(title = "Maritime Rainbow Parrot")+
+  ggeasy::easy_center_title()
+
+
 
 #Practice
 combo$BINARY <- (na.omit(combo$BINARY))
@@ -138,7 +174,7 @@ ggplot() +
   scale_fill_cmocean("Binary", name = "dense", na.value="white", discrete = TRUE) +
   geom_sf(data = world, fill = "coral",
           colour = "white", size = 0.2)+
-  labs(title = "Tuna") +
+  labs(title = "Cod") +
   ggeasy::easy_center_title()+
   xlab("Longitude") + # for the x axis label
   ylab("Latitude")
