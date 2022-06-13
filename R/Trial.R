@@ -27,12 +27,12 @@ geo <- read.csv("~/Dropbox/FOME_DATA/GEOGRAPHICAL_LAYER/GEO_SPATIAL_META_MOL720G
 View(geo)
 
 #mapping shapefile
-maritime_area <- readOGR("~/Documents/MSC_Thesis/ScotianShelf_BayOfFundy_Bioregion/MaritimesPlanningArea.shp")
-GEO <- readOGR("~/Dropbox/FOME_DATA/720 x 228 grid GIS INFO/720x228global.shp") %>%
-  st_as_sf(GEO, coords = c("longitude","latitude"), crs = "+proj=longlat +datum=WGS84 +no_defs", remove = FALSE)
+#maritime_area <- readOGR("~/Documents/MSC_Thesis/ScotianShelf_BayOfFundy_Bioregion/MaritimesPlanningArea.shp")
+#GEO <- readOGR("~/Dropbox/FOME_DATA/720 x 228 grid GIS INFO/720x228global.shp") %>%
+#  st_as_sf(GEO, coords = c("longitude","latitude"), crs = "+proj=longlat +datum=WGS84 +no_defs", remove = FALSE)
 
-
-grid <- st_read("~/Dropbox/FOME_DATA/720 x 228 grid GIS INFO/720x228global.shp") #grid data
+grid <- st_read("~/Dropbox/FOME_DATA/720 x 228 grid GIS INFO/720x228global.shp") %>% #grid data
+  st_as_sf(grid, coords = c("longitude","latitude"), crs = "+proj=longlat +datum=WGS84 +no_defs", remove = FALSE)
 #reads as 164160 observations of 19 variables
 
 world <- ne_countries(scale = "medium", returnclass = "sf") %>%
@@ -46,11 +46,21 @@ MaritimeGrid <- st_intersection(grid, maritime_bounds_WGS84)
 
 
 #PLOT maritime area and grid cells that overlap with it
-ggplot() + geom_polygon(data = maritime_area, aes(x = long, y = lat, group = group), colour = "black", fill = NA) + 
+ggplot() + geom_sf(data = maritime_bounds_WGS84, colour = "black", fill = NA) + 
  geom_point(data = MaritimeGrid, aes(x = X_COORD, y = Y_COORD), colour = "red", fill = NA)+
-  labs(title = "Maritime Grid")+
-  ggeasy::easy_center_title()
+  #add axes info
+  theme_minimal()+
+  labs(title = "Cod") +
+  ggeasy::easy_center_title()+
+  xlab("Longitude") + # for the x axis label
+  ylab("Latitude")
 
+  labs(title = "Maritime Grid")+
+  ggeasy::easy_center_title()+
+  xlab("Longitude")+
+  ylab("Latitude")
+
+#create an empty list of grid cells * species ID and read in the SDM then get rid of it
 #Trying to save the grid cells that fit within the maritime region as a function
 ###PRACTICE BUT NOT USING YET###
 spatial_isolation_function <- function(MaritimeGrid) {
@@ -97,19 +107,19 @@ AtTuncoords <- st_as_sf(combined_AtTun, coords = c("longitude","latitude"), crs 
 #don't join the species but rather see if they are present and if present, add to a list
 
 combo <- st_join(grid, AtCodcoords) #both need to be sf format as join is performed spatially
-rast <- st_rasterize(combo %>% dplyr::select(BINARY, geometry)) #rasterize for easier plotting
 
-MaritimeCod <- st_intersects(maritime_bounds_WGS84, combo) #causes R program to reboot
+MaritimeCod <- st_intersection( combo, maritime_bounds_WGS84) #causes R program to reboot
 class(MaritimeCod)
 
-#is this right? looking at only the 1 value
-MaritimeCod_present <- combo[MaritimeCod[[1]],]
-class(MaritimeCod_present)
-
-ggplot() + geom_polygon(data = maritime_area, aes(x = long, y = lat, group = group), colour = "black", fill = NA) + 
-  geom_point(data = MaritimeCod_present, aes(x = X_COORD, y = Y_COORD), colour = "red", fill = NA) +
+ggplot() + geom_sf(data = maritime_bounds_WGS84, colour = "black", fill = NA) + 
+  geom_point(data = MaritimeCod, aes(x = X_COORD, y = Y_COORD, colour = BINARY)) +
   labs(title = "Maritime Cod")+
-  ggeasy::easy_center_title()
+  scale_color_manual(name = "Presence/ Absence",
+                                                  values = c("1" = "#bf0584",
+                                                             "0" = "blue")) +
+  ggeasy::easy_center_title()+
+  xlab("Longitude")+
+  ylab("Latitude")
 
 ###PRACTICING WITH A SPECIES NOT IN NW ATLANTIC TO SEE IF IT WORKS####
 ## Rainbow parrotfish = Scarus guacamaia = SPID 10817
@@ -117,8 +127,8 @@ RainbowParrot <- read.csv(unzip("~/Dropbox/FOME_DATA/FINAL_SDM_RANGE_V4.zip", "F
 
 
 #Only looking at Binary so need to make that column categorical
-RainbowParrot$BINARY <- ordered(RainbowParrot$BINARY, levels = 0:1)
-str(RainbowParrot)
+#RainbowParrot$BINARY <- ordered(RainbowParrot$BINARY, levels = 0:1)
+#str(RainbowParrot)
 
 #combine Atlantic Cod and Tuna with geo file
 combined_RainbowParrot <- merge(RainbowParrot, geo, by.x="INDEX", by.y="row.names")
@@ -127,19 +137,25 @@ RbParrotcoords <- st_as_sf(combined_RainbowParrot, coords = c("longitude","latit
 #don't join the species but rather see if they are present and if present, add to a list
 
 comboRbParrot <- st_join(grid, RbParrotcoords) #both need to be sf format as join is performed spatially
-rast <- st_rasterize(comboRbParrot %>% dplyr::select(BINARY, geometry)) #rasterize for easier plotting
+#rast2 <- st_rasterize(comboRbParrot %>% dplyr::select(BINARY, geometry)) #rasterize for easier plotting
 
-MaritimeRbParrot <- st_intersects(maritime_bounds_WGS84, comboRbParrot) #causes R program to reboot
+MaritimeRbParrot <- st_intersection(comboRbParrot, maritime_bounds_WGS84) #causes R program to reboot
 class(MaritimeRbParrot)
 
 #is this right? looking at only the 1 value
-MaritimeRbParrot_present <- combo[MaritimeRbParrot[[1]],]
-class(MaritimeRbParrot_present)
+#MaritimeRbParrot_present <- combo[MaritimeRbParrot[[1]],]
+#class(MaritimeRbParrot_present)
 
-ggplot() + geom_polygon(data = maritime_area, aes(x = long, y = lat, group = group), colour = "black", fill = NA) + 
-  geom_point(data = MaritimeRbParrot_present, aes(x = X_COORD, y = Y_COORD), colour = "red", fill = NA) +
+ggplot() + geom_sf(data = maritime_bounds_WGS84, colour = "black", fill = NA) + 
+  theme_minimal()+
+  geom_point(data = MaritimeRbParrot, aes(x = X_COORD, y = Y_COORD, colour = BINARY)) +
+  scale_color_manual(name = "Presence",
+                     values = c("1" = "#bf0584",
+                                "0" = "blue")) +
   labs(title = "Maritime Rainbow Parrot")+
-  ggeasy::easy_center_title()
+  ggeasy::easy_center_title() +
+  xlab("Longitude")+
+  ylab("Latitude")
 
 
 
@@ -158,12 +174,15 @@ ifelse(combo$BINARY %in% c("0","1"), transmute(combo, species_pres = 2113))
 transmute(combo, species_pres = ifelse(BINARY %in% c("0","1"), "Present", )))
 
 
-ggplot() + geom_polygon(data = maritime_area, aes(x = long, y = lat, group = group), colour = "black", fill = NA) + 
+ggplot() + geom_sf(data = maritime_bounds_WGS84, colour = "black", fill = NA) + 
   geom_point(data = MaritimeCod, aes(x = X_COORD, y = Y_COORD), colour = "red", fill = NA)
 
 
 #Matthew GGplot - Richness ----
 #data("World") #grab data set
+
+rast <- st_rasterize(combo %>% dplyr::select(BINARY, geometry)) #rasterize for easier plotting
+
 library(cmocean)
 world <- ne_countries(scale = "medium", returnclass = "sf") %>% #world data
   st_transform(crs = "+proj=longlat +datum=WGS84 +no_defs")
