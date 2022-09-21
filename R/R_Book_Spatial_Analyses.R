@@ -665,3 +665,754 @@ new.georgia <- readOGR("georgia.shp")
 library(sf)
 g2 <- st_read("georgia.shp")
 st_write(g2, "georgia.shp", delete_layer = T)
+
+#CHAPTER 3
+#3.1 OVERVIEW
+#Rows = person/place/thing
+#Columns = some attribute associated with that thing
+#IN geographical data, the row = geographical location 
+  #& column = point, line or area
+#All data is spatio-temporal (collected at some place and some time)
+
+#To check if a package is already installed:
+is.element("raster", installed.packages()) 
+library(raster)
+help("raster")
+
+data(newhaven)
+ls()
+class(breach) #SpatialPoints = without attributes
+class(blocks) #SpatialPolygonsDataframe = polygon with attributes
+
+head(data.frame(blocks)) #look at the first few rows of data for the blocks attribute
+head(blocks@data) #this does the same as above
+
+plot(blocks)
+
+#This adds roads in red and blocks in black on same plot
+par(mar = c(0,0,0,0))
+plot(roads, col="red")
+plot(blocks, add = T)
+
+#In R, there are Points, Linestrings (sequence of points connected by straight line), polygon (2d), multipoint, multilinestrings, multipolygon
+
+library(sf)
+vignette(package = "sf") #vignette provide additional info to the help page
+vignette("sf1", package = "sf")
+
+# load the georgia data
+data(georgia)
+# conversion to sf
+georgia_sf = st_as_sf(georgia)
+class(georgia_sf)
+georgia_sf #first 10 rows are shown
+georgia
+
+# all attributes
+plot(georgia_sf) #shades the first few objects within the dataset
+# selected attribute
+plot(georgia_sf[, 6]) #choosing the sixth column attribute
+# selected attributes
+plot(georgia_sf[,c(4,5)]) #plots two attributes bc concatenate
+
+#Compare the headings of sp vs sf
+## sp SpatialPolygonDataFrame object 
+head(data.frame(georgia))
+## sf polygon object
+head(data.frame(georgia_sf))
+  #dataframes of the sf objects have geometry attributes
+  #can convert sp by using the as function
+g2 <- as(georgia_sf, "Spatial") #changes it from sf to sp
+class(g2)
+
+roads_sf <- st_as_sf(roads)
+class(roads_sf)
+r2 <- as(roads_sf, "Spatial")
+class(r2)
+r2 <- as(roads, "sf")
+
+#3.3 reading to and writing from sp format
+library(rgdal)
+
+writeOGR(obj=georgia, dsn=".", layer="georgia", 
+         driver="ESRI Shapefile", overwrite_layer=T) 
+#this can now be used in ArcGIS
+new.georgia <- readOGR("georgia.shp") 
+class(new.georgia)
+
+writeOGR(new.georgia, dsn = ".", layer = "georgia", 
+         driver="ESRI Shapefile", overwrite_layer = T) #overwrite meaning it will write over existing similarly named file
+#dsn = working directory it will be saved to - where "." is the current working directory
+
+td <- getwd()
+writeOGR(new.georgia, dsn = td, layer = "georgia", 
+         driver="ESRI Shapefile", overwrite_layer = T)
+
+#Can also use readGDAL and writeGDAL for raster files
+
+#READING TO AND WRITING FROM SF FORMAT
+g2 <- st_read("georgia.shp")
+#To write a sf feature to a file, it needs the object and the filename
+
+st_write(g2, "georgia.shp", delete_layer = T)
+#need to delete the layer because the geogia shape file exists in the working directory
+
+#Below command is same as above with the one below writes out the defaults
+st_write(g2, dsn = "georgia.shp", layer = "georgia.shp", 
+         driver = "ESRI Shapefile", delete_layer = T)
+
+#The sf2 vignette has the prefix options (e.g., ".shp")
+vignette("sf2", package = "sf")
+
+#3.4 MAPPING: AN INTRODUCTION TO tmap
+#tmap can take sf or sp objects
+rm(list=ls())
+
+#qtm = quick tmap
+data(georgia)
+georgia_sf <- st_as_sf(georgia) 
+
+install.packages("tmap")
+library(tmap)
+qtm(georgia, fill = "red", style = "natural")
+#fill can be a colour or variable
+
+qtm(georgia_sf, fill="MedInc", text="Name", text.size=0.5, 
+    format="World_wide", style="classic", 
+    text.root=5, fill.title="Median Income")
+
+#3.4.3 Full tmap
+#can add a series of layers to the map
+#tm_shape = data plotted
+#tm_aes = what is plotted
+
+# do a merge
+g <- st_union(georgia_sf)
+# for sp
+# g <- gUnaryUnion(georgia, id = NULL)
+
+# plot the spatial layers
+tm_shape(georgia_sf) +
+  tm_fill("tomato")
+
+tm_shape(georgia_sf) +
+  tm_fill("tomato") +
+  tm_borders(lty = "dashed", col = "gold") #added gold borders
+
+tm_shape(georgia_sf) +
+  tm_fill("tomato") +
+  tm_borders(lty = "dashed", col = "gold") +
+  tm_style("natural", bg.color = "grey90") #background colour
+
+tm_shape(georgia_sf) +
+  tm_fill("tomato") +
+  tm_borders(lty = "dashed", col = "gold") +
+  tm_style("natural", bg.color = "grey90") +
+  # now add the outline
+  tm_shape(g) +
+  tm_borders(lwd = 2) #now adding an outline
+
+#Now the title
+tm_shape(georgia_sf) +
+  tm_fill("tomato") +
+  tm_borders(lty = "dashed", col = "gold") +
+  tm_style("natural", bg.color = "grey90") +
+  # now add the outline
+  tm_shape(g) +
+  tm_borders(lwd = 2) +
+  tm_layout(title = "The State of Georgia", 
+            title.size = 1, title.position = c(0.55, "top"))
+is.element("grid", installed.packages())
+library(grid)
+
+#So now want to plot two plots side by side using different data
+# 1st plot of georgia
+t1 <- tm_shape(georgia_sf) +
+  tm_fill("coral") +
+  tm_borders() +
+  tm_layout(bg.color = "grey85") 
+# 2nd plot of georgia2
+t2 <- tm_shape(georgia2) +
+  tm_fill("orange") +
+  tm_borders() +
+  # the asp paramter controls aspect
+  # this is makes the 2nd plot align
+  tm_layout(asp = 0.86,bg.color = "grey95")
+
+library(grid)
+# open a new plot page
+grid.newpage()
+# set up the layout
+pushViewport(viewport(layout=grid.layout(1,2))) # set it up with 1 row, 2 columns
+# plot using the print command
+print(t1, vp=viewport(layout.pos.col = 1, height = 5))
+print(t2, vp=viewport(layout.pos.col = 2, height = 5))
+
+data.frame(georgia_sf)[,13]
+#these are the attributes of the 13th column
+#to display the text on the map:
+
+tm_shape(georgia_sf) +
+  tm_fill("white") +
+  tm_borders() +
+  tm_text("Name", size = 0.3) + #where name is a column
+  tm_layout(frame = FALSE)
+
+#To subset the data, pull out the names you want
+index <- c(81, 82, 83, 150, 62, 53, 21, 16, 124, 121, 17)
+georgia_sf.sub <- georgia_sf[index,]
+
+tm_shape(georgia_sf.sub) +
+  tm_fill("gold1") +
+  tm_borders("grey") +
+  tm_text("Name", size = 1) +
+  # add the outline
+  tm_shape(g) +
+  tm_borders(lwd = 2) +
+  # specify some layout parameters
+  tm_layout(frame = FALSE, title = "A subset of Georgia", 
+            title.size = 1.5, title.position = c(0., "bottom"))
+
+#Notice how tmap subgroups into the layers
+# the 1st layer
+tm_shape(georgia_sf) +
+  tm_fill("white") +
+  tm_borders("grey", lwd = 0.5) +
+  # the 2nd layer
+  tm_shape(g) +
+  tm_borders(lwd = 2) +
+  # the 3rd layer
+  tm_shape(georgia_sf.sub) +
+  tm_fill("lightblue") +
+  tm_borders() +
+  # specify some layout parameters
+  tm_layout(frame = T, title = "Georgia with a subset of counties", 
+            title.size = 1, title.position = c(0.02, "bottom"))
+
+#3.4.4 Adding context
+#Usually a map with more info is better
+#Google Maps, OpenStreetMap, Leaflet
+install.packages(c("OpenStreetMap"),depend=T) 
+
+library(OpenStreetMap)
+# define upper left, lower right corners 
+georgia.sub <- georgia[index,]
+ul <- as.vector(cbind(bbox(georgia.sub)[2,2], 
+                      bbox(georgia.sub)[1,1]))
+lr <- as.vector(cbind(bbox(georgia.sub)[2,1], 
+                      bbox(georgia.sub)[1,2]))
+# download the map tile
+MyMap <- openmap(ul,lr)
+# now plot the layer and the backdrop
+par(mar = c(0,0,0,0))
+plot(MyMap, removeMargin=FALSE)
+plot(spTransform(georgia.sub, osm()), add = TRUE, lwd = 2)
+#this spTransform command transforms the subset into spatial data
+  #this makes it easier to work with
+
+install.packages(c("RgoogleMaps"),depend=T) 
+
+# load the package
+library(RgoogleMaps)
+# convert the subset
+shp <- SpatialPolygons2PolySet(georgia.sub) #converts the subset to a polygon
+# determine the extent of the subset
+bb <- qbbox(lat = shp[,"Y"], lon = shp[,"X"])
+# download map data and store it
+MyMap <- GetMap.bbox(bb$lonR, bb$latR, destfile = "DC.jpg")
+# now plot the layer and the backdrop
+par(mar = c(0,0,0,0))
+PlotPolysOnStaticMap(MyMap, shp, lwd=2, 
+                     col = rgb(0.25,0.25,0.25,0.025), add = F) #defines the polygon over Google Maps
+
+#Leadlet is good for when you want to embed interactive maps in an html file
+tmap_mode('view') #interactive viewing needing internet connection
+tm_shape(georgia_sf.sub) +
+  tm_polygons(col = "#C6DBEF80" )
+tmap_mode("plot") #viewing without interactive/internet
+#remember to reset the tmap mode to plot
+
+#3.4.5 Saving your map
+#Fastest & quickest way is using the export button to save or copy to clipboar
+
+#in a new document I did this
+# load package and data
+#library(GISTools)
+#data(newhaven)
+#proj4string(roads) <- proj4string(blocks)
+# plot spatial data
+#tm_shape(blocks) +
+#  tm_borders() +
+#  tm_shape(roads) +
+#  tm_lines(col = "red") +
+  # embellish the map
+#  tm_scale_bar(width = 0.22) +
+#  tm_compass(position = c(0.8, 0.07)) +
+#  tm_layout(frame = F, title = "New Haven, CT", 
+#            title.size = 1.5, 
+#            title.position = c(0.55, "top"), 
+#            legend.outside = T) 
+
+#png(file='title', other setting)
+source("newhavenmap.R") 
+dev.off()
+
+pts_sf <- st_centroid(georgia_sf)
+setwd('~/Desktop/')
+# open the file
+png(filename = "Figure1.png", w = 5, h = 7, units = "in", res = 150)
+# make the map
+tm_shape(georgia_sf) +
+  tm_fill("olivedrab4") +
+  tm_borders("grey", lwd = 1) +
+  # the points layer
+  tm_shape(pts_sf) +
+  tm_bubbles("PctBlack", title.size = "% Black", col = "gold")
+# close the png file
+dev.off()
+
+#3.5 Mapping Spatial Data Attributes
+rm(list=ls())
+# load & list the data
+data(newhaven)
+ls()
+# convert to sf 
+blocks_sf <- st_as_sf(blocks)
+breach_sf <- st_as_sf(breach)
+tracts_sf <- st_as_sf(tracts)
+# have a look at the attributes and object class
+summary(blocks_sf) #spatial
+class(blocks_sf)
+summary(breach_sf) #point object
+class(breach_sf)
+summary(tracts_sf) #spatial
+class(tracts_sf)
+#all have data.frame
+#breach has geometry attributes
+
+data.frame(blocks_sf) #prints out all rows for blocks until limit is reached
+head(data.frame(blocks_sf)) #prints out top 6 rows
+colnames(data.frame(blocks_sf))
+# or 
+names(blocks_sf) #just the col names
+
+#For spatial objects, can also use @data to access the data
+colnames(blocks@data)
+head(blocks@data)
+
+#To access a particualr column: 
+data.frame(blocks_sf$P_VACANT) #lists them all in a col
+blocks$P_VACANT # this lists them all back to back
+#or
+attach(data.frame(blocks_sf)) #data frame attached to blocks now?
+hist(P_VACANT)
+#make sure you detach the data if you do this though as otherwise it can get messy with multiple dataframes on one variable
+detach(data.frame(blocks_sf))
+
+# use kde.points to create a kernel density surface
+breach.dens = st_as_sf(kde.points(breach,lims=tracts))
+summary(breach.dens)
+#breach.dens = raster/pixels dataset with attributes in the data frame
+breach.dens #has latitude and longitude
+plot(breach.dens)
+
+#can also add new attributes to variables
+blocks_sf$RandVar <- rnorm(nrow(blocks_sf))
+#this adds a new column called random variable
+
+#3.5.3 Mapping polygons and attributes
+#a chloropleth = thematic map in which areas are shaded in proportion to their attributes
+tmap_mode('plot') #this is set to a non-interactive map
+tm_shape(blocks_sf) +
+  tm_polygons("P_VACANT") #automatically shades by attributes
+#tmap is similar to ggplot in that you can pass it multiple functions
+#tmap gives an automatic legend for this mapping
+
+tm_shape(blocks_sf) +
+  tm_polygons("P_OWNEROCC", breaks=seq(0, 100, by=25)) #every 25 is a shade
+
+tm_shape(blocks_sf) +
+  tm_polygons("P_OWNEROCC", breaks=c(10, 40, 60, 90))
+
+tm_shape(blocks_sf) +
+  tm_polygons("P_OWNEROCC", title = "Owner Occ") +
+  tm_layout(legend.title.size = 1, #layout changes the legend size & placement
+            legend.text.size = 1,
+            legend.position = c(0.1, 0.1)) #could also say "centre" and "bottom"
+
+#To view colour options:
+display.brewer.all()
+
+brewer.pal(5,'Blues')
+
+tm_shape(blocks_sf) +
+  tm_polygons("P_OWNEROCC", title = "Owner Occ", palette = "Reds") + #this pallette specifies reds
+  tm_layout(legend.title.size = 1)
+#if you use tm_fill, this will colour the polygons but the outlines will not be plotted 
+  #unless also using tm_borders
+
+tm_shape(blocks_sf) +
+  tm_fill("P_OWNEROCC", title = "Owner Occ", palette = "Blues") +
+  tm_layout(legend.title.size = 1)
+
+# with equal intervals: the tmap default
+p1 <- tm_shape(blocks_sf) +
+  tm_polygons("P_OWNEROCC", title = "Owner Occ", palette = "Blues") +
+  tm_layout(legend.title.size = 0.7)
+# with style = kmeans
+p2 <- tm_shape(blocks_sf) +
+  tm_polygons("P_OWNEROCC", title = "Owner Occ", palette = "Oranges",
+              style = "kmeans") +
+  tm_layout(legend.title.size = 0.7)
+# with quantiles
+p3 <- tm_shape(blocks_sf) +
+  tm_polygons("P_OWNEROCC", title = "Owner Occ", palette = "Greens", 
+              breaks = c(0, round(quantileCuts(blocks$P_OWNEROCC, 6), 1))) +
+  tm_layout(legend.title.size = 0.7)
+# Multiple plots using the grid package
+library(grid)
+grid.newpage()
+# set up the layout
+pushViewport(viewport(layout=grid.layout(1,3)))
+# plot using the print command
+print(p1, vp=viewport(layout.pos.col = 1, height = 5))
+print(p2, vp=viewport(layout.pos.col = 2, height = 5))
+print(p3, vp=viewport(layout.pos.col = 3, height = 5))
+
+#Can also display a histogram on the plot
+tm_shape(blocks_sf) +
+  tm_polygons("P_OWNEROCC", title = "Owner Occ", palette = "-GnBu", #the negative here reverses the pallete colour scheme
+              breaks = c(0, round(quantileCuts(blocks$P_OWNEROCC, 6), 1)), 
+              legend.hist = T) +
+  tm_scale_bar(width = 0.22) +
+  tm_compass(position = c(0.8, 0.07)) +
+  tm_layout(frame = F, title = "New Haven", 
+            title.size = 2, title.position = c(0.55, "top"), 
+            legend.hist.size = 0.5)
+
+# add a projection to tracts data and convert tracts data to sf
+proj4string(tracts) <- proj4string(blocks)
+tracts_sf <- st_as_sf(tracts)
+tracts_sf <- st_transform(tracts_sf, "+proj=longlat +ellps=WGS84")
+# plot 
+tm_shape(blocks_sf) +
+  tm_fill(col="POP1990", convert2density=TRUE, #the convert2density command = converts projection units (in this case latitude and longitude) to project in metres
+            #then it determines the areal density in square kilometres
+          style="kmeans", title=expression("Population (per " * km^2 * ")"), 
+          legend.hist=F, id="name") +
+  tm_borders("grey25", alpha=.5) + 
+  # add tracts context
+  tm_shape(tracts_sf) +
+  tm_borders("grey40", lwd=2) 
+#+ 
+  #tm_format(bg.color="white", frame = FALSE, 
+  #              legend.hist.bg.color="grey90")
+
+#Create the population density summary
+# add an area in km^2 to blocks
+blocks_sf$area = st_area(blocks_sf) / (1000*1000)
+# calculate population density manually
+summary(blocks_sf$POP1990/blocks_sf$area)
+
+tm_shape(blocks_sf) +
+  tm_fill(c("P_RENTROCC", "P_BLACK")) +
+  tm_borders() +
+  tm_layout(legend.format = list(digits = 0), 
+            legend.position = c("left", "bottom"),
+            legend.text.size = 0.5,
+            legend.title.size = 0.8)
+
+tm_polygons
+
+#3.5.4 Mapping points and attributes
+#breach data = public disordination
+#plotting lines is similar to plotting polygons
+tm_shape(blocks_sf) +
+  tm_polygons("white") + #tells it you want the polygon first
+  tm_shape(breach_sf) +
+  tm_dots(size = 0.5, shape = 19, col = "red", alpha = 0.5) #gives the dots
+
+#New dataset with points
+# load the data
+data(quakes)
+# look at the first 6 records
+head(quakes)
+
+#Difficult to manually create sf data so better to create sp data then convert
+# define the coordinates
+coords.tmp <- cbind(quakes$long, quakes$lat)
+# create the SpatialPointsDataFrame
+quakes.sp <- SpatialPointsDataFrame(coords.tmp, 
+                                    data = data.frame(quakes), 
+                                    proj4string = CRS("+proj=longlat "))
+# convert to sf
+quakes_sf <- st_as_sf(quakes.sp)
+
+# map the quakes
+tm_shape(quakes_sf) +
+  tm_dots(size = 0.5, alpha = 0.3)
+
+#Steps for creating spatial data
+#Step 1. Define the coordinates
+#Step 2. Assign them to an sp class of object 
+#Step 3. Convert to sf if needed
+help("SpatialPoints-class") #points just need a pair of coordinates
+help("sf") #polygons/lines need lists of coordinates
+
+#The quake data also has magnitude data that can be visualized in multiple ways
+#could use size of dot or colour
+library(grid)
+# by size
+p1 <- tm_shape(quakes_sf) +
+  tm_bubbles("depth", scale = 1, shape = 19, alpha = 0.3, 
+             title.size="Quake Depths")
+# by colour
+p2 <- tm_shape(quakes_sf) +
+  tm_dots("depth", shape = 19, alpha = 0.5, size = 0.6, 
+          palette = "PuBuGn", 
+          title="Quake Depths")
+# Multiple plots using the grid package
+grid.newpage()
+# set up the layout
+pushViewport(viewport(layout=grid.layout(1,2)))
+# plot using he print command
+print(p1, vp=viewport(layout.pos.col = 1, height = 5))
+print(p2, vp=viewport(layout.pos.col = 2, height = 5))
+
+#Can also subset the data for points over magnitude 5.5
+# create the index
+index <- quakes_sf$mag > 5.5
+summary(index)
+# select the subset assign to tmp
+tmp <- quakes_sf[index,]
+# plot the subset
+tm_shape(tmp) +
+  tm_dots(col = brewer.pal(5, "Reds")[4], shape = 19, 
+          alpha = 0.5, size = 1) + 
+  tm_layout(title="Quakes > 5.5",
+            title.position = c("centre", "top"))
+
+#can use a google map backdrop
+library(RgoogleMaps)
+# define Lat and Lon
+Lat <- as.vector(quakes$lat)
+Long <- as.vector(quakes$long)
+# get the map tiles 
+# you will need to be online
+MyMap <- MapBackground(lat=Lat, lon=Long)
+# define a size vector
+tmp <- 1+(quakes$mag - min(quakes$mag))/max(quakes$mag)
+PlotOnStaticMap(MyMap,Lat,Long,cex=tmp,pch=1,col='#FB6A4A30')
+
+MyMap <- MapBackground(lat=Lat, lon=Long, zoom = 10, 
+                       maptype = "satellite")
+PlotOnStaticMap(MyMap,Lat,Long,cex=tmp,pch=1,
+                col='#FB6A4A50')
+
+#3.5.5 Mapping lines and attributes
+#lines can be roads 
+#need to assign a coordinate system to roads
+data(newhaven)
+proj4string(roads) <- proj4string(blocks)
+# 1. create a clip area
+xmin <- bbox(roads)[1,1]
+ymin <- bbox(roads)[2,1]
+xmax <- xmin + diff(bbox(roads)[1,]) / 2
+ymax <- ymin + diff(bbox(roads)[2,]) / 2
+xx = as.vector(c(xmin, xmin, xmax, xmax, xmin))
+yy = as.vector(c(ymin, ymax, ymax, ymin, ymin))
+# 2. create a spatial polygon from this
+crds <- cbind(xx,yy)
+Pl <- Polygon(crds)
+ID <- "clip"
+Pls <- Polygons(list(Pl), ID=ID)
+SPls <- SpatialPolygons(list(Pls))
+df <- data.frame(value=1, row.names=ID)
+clip.bb <- SpatialPolygonsDataFrame(SPls, df)
+proj4string(clip.bb) <- proj4string(blocks)
+# 3. convert to sf
+# convert the data to sf
+clip_sf <- st_as_sf(clip.bb)
+roads_sf <- st_as_sf(roads)
+# 4. clip out the roads and the data frame
+roads_tmp <- st_intersection(st_cast(clip_sf), roads_sf)
+
+#to avoid the warning error
+roads_tmp <- st_intersection(st_geometry(st_cast(clip_sf)), st_geometry(roads_sf))
+  #where x = st_cast(clip_sf) and y = roads_sf
+
+#3.5.6 Mapping Raster Attributes
+# you may have to install the raster package
+# install.packages("raster", dep = T)
+library(raster)
+library(sp)
+data(meuse.grid)
+class(meuse.grid)
+summary(meuse.grid)
+
+#can then plot the x and y to examine the dataset
+plot(meuse.grid$x, meuse.grid$y, asp = 1)
+#can then convert to Spatial Pixel Dataframe object then converted to raster format
+meuse.sp = SpatialPixelsDataFrame(points = 
+                                    meuse.grid[c("x", "y")], data = meuse.grid, 
+                                  proj4string = CRS("+init=epsg:28992"))
+meuse.r <- as(meuse.sp, "RasterStack") #converts to raster
+
+#Then try plotting sf using all of the attributes vs sp it will plot the specified layer of the meuse grid
+plot(meuse.r)
+plot(meuse.sp[,5]) #column 
+spplot(meuse.sp[, 3:4])
+image(meuse.sp[, "dist"], col = rainbow(7))
+spplot(meuse.sp, c("part.a", "part.b", "soil", "ffreq"),
+       col.regions=topo.colors(20))
+
+#If you want to control the mappping of the attributes more, use tmap
+# set the tmap mode to plot
+tmap_mode('plot')
+# map dist and ffreq attributes
+tm_shape(meuse.r) +
+  tm_raster(col = c("dist", "ffreq"), title = c("Distance", "Flood Freq"),
+            palette = "Reds", style = c("kmeans", "cat"))
+
+# set the tmap mode to view
+tmap_mode('view')
+# map the dist attribute 
+tm_shape(meuse.r) +
+  tm_raster(col = "dist", title = "Distance", style = "kmeans") +
+  tm_layout(legend.format = list(digits = 1))
+
+#You could also experiment with some of the refinements as with tm_polygons examples
+tm_shape(meuse.r) +
+  tm_raster(col = "soil", title = "Soil",
+            palette = "Spectral", style = "cat") +
+  tm_scale_bar(width = 0.3) +
+  tm_compass(position = c(0.74, 0.05)) +
+  tm_layout(frame = F, title = "Meuse flood plain", 
+            title.size = 2, title.position = c("0.2", "top"), 
+            legend.hist.size = 0.5)
+
+#3.6 Simple descriptive statistical analyses
+library(tidyverse)
+install.packages("reshape2", dep = T) #doesnt work with Mac again
+
+#3.6.1 Histograms and Boxplots
+data(newhaven)
+# the tidyverse package loads the ggplot2 package
+library(tidyverse)
+pushViewport(viewport(layout=grid.layout(2,1))) # set it up with 1 row, 2 columns
+
+# standard approach with hist
+hist(blocks$P_VACANT, breaks = 40, col = "cyan", 
+     border = "salmon", 
+     main = "The distribution of vacant property percentages", 
+     xlab = "percentage vacant", xlim = c(0,40))
+# ggplot approach
+ggplot(blocks@data, aes(P_VACANT)) +
+  geom_histogram(col = "salmon", fill = "cyan", bins = 40) +
+  xlab("percentage vacant") +
+  labs(title = "The distribution of vacant property percentages")
+
+library(reshape2)
+# a logical test
+index <- blocks$P_VACANT > 10
+# assigned to 2 high, 1 low
+blocks$vac <- index + 1
+blocks$vac <- factor(blocks$vac, labels = c("Low", "High"))
+
+library(ggplot2)
+ggplot(melt(blocks@data[, c("P_OWNEROCC", "P_WHITE", "P_BLACK", "vac")]), 
+       aes(variable, value)) +
+  geom_boxplot() +
+  facet_wrap(~vac)
+
+#manipulate it using melt from reshape2
+ggplot(melt(blocks@data[, c("P_OWNEROCC", "P_WHITE", "P_BLACK", "vac")]), 
+       aes(variable, value)) +
+  geom_boxplot(colour = "yellow", fill = "wheat", alpha = 0.7) +
+  facet_wrap(~vac) +
+  xlab("") +
+  ylab("Percentage") +
+  theme_dark() +
+  ggtitle("Boxplot of High and Low property vacancies")
+
+#3.6.2 Scatter Plots and Regressions
+#to see if we can visualize any trends in vacant properties and proportions of different ethnic groups:
+plot(blocks$P_VACANT/100, blocks$P_WHITE/100) #might be more white people in a census block
+plot(blocks$P_VACANT/100, blocks$P_BLACK/100) #might be a positive association with black people and vacant property due to socio-economic inequalities
+
+#Let's look into this:
+# assign some variables
+p.vac <- blocks$P_VACANT/100
+p.w <- blocks$P_WHITE/100
+p.b <- blocks$P_BLACK/100
+# bind these together
+df <- data.frame(p.vac, p.w, p.b)
+# fit regressions
+mod.1 <- lm(p.vac ~ p.w, data = df) #describes the extent to which changes in p.vac are associated with change in p.w
+mod.2 <- lm(p.vac ~ p.b, data = df) #describes the extent to which changes in p.vac are associated with changes in p.b
+#use function lm to fit a linear regression model
+
+#found that proportion of white people is a weak negative predictor of the proportion of vacant property in a census block
+#and that the proportion of black people is a weak positive predictor of the proportion of vacant property in a census block
+#Specifically, vacant property decreases by 1% for each 3.5% increase in the proportion of white people
+#vacant property increases by 1% for each 3.7% increase in proportion of black people in census block
+
+p1 <- ggplot(df,aes(p.vac, p.w))+
+  #stat_summary(fun.data=mean_cl_normal) + 
+  geom_smooth(method='lm') +
+  geom_point() +
+  xlab("Proportion of Vacant Properties") +
+  ylab("Proporion White") +
+  labs(title = "Regression of Vacant Properties against Proportion White")
+p2 <- ggplot(df,aes(p.vac, p.b))+
+  #stat_summary(fun.data=mean_cl_normal) + 
+  geom_smooth(method='lm') +
+  geom_point() +
+  xlab("Proportion of Vacant Properties") +
+  ylab("Proporion Black") +
+  labs(title = "Regression of Vacant Properties against Proportion Black")
+
+grid.newpage()
+# set up the layout
+pushViewport(viewport(layout=grid.layout(2,1)))
+# plot using he print command
+print(p1, vp=viewport(layout.pos.row = 1, height = 5))
+print(p2, vp=viewport(layout.pos.row = 2, height = 5))
+
+#3.6.3 Mosaic Plots
+#mosaic plots good for true or false statements
+
+# install the package
+install.packages("ggmosaic", dep = T) #does not work in Mac again
+
+# create the dataset
+pops <- data.frame(blocks[,14:18]) * data.frame(blocks)[,11]
+pops <- as.matrix(pops/100)
+colnames(pops) <- c("White", "Black", "Ameri", "Asian", "Other")
+# a true / false for vacant properties 
+vac.10 <- (blocks$P_VACANT > 10) 
+# create a cross tabulation
+mat.tab <- xtabs(pops ~vac.10)
+# melt the data
+df <- melt(mat.tab)
+
+# load the packages
+library(ggmosaic)
+# call ggplot and stat_mosaic
+ggplot(data = df) +
+  stat_mosaic(aes(weight = value, x = product(Var2), 
+                  fill=factor(vac.10)), na.rm=TRUE) +
+  theme(axis.text.x=element_text(angle=-90, hjust= .1)) + 
+  labs(y='Proportion of Vacant Properties', x = 'Ethnic group',
+       title="Mosaic Plot of Vacant Properties with ethnicty") + 
+  guides(fill=guide_legend(title = "> 10 percent", reverse = TRUE))
+
+# standard mosiac plot
+ttext = sprintf("Mosaic Plot of Vacant Properties 
+  with ethnicty")
+mosaicplot(t(mat.tab),xlab='',
+           ylab='Vacant Properties > 10 percent',
+           main=ttext,shade=TRUE,las=3,cex=0.8)
+
+#3.7 Self-Test Questions
+

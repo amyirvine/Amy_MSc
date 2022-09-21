@@ -14,13 +14,15 @@ Sys.getenv("GCC_INCLUDE")
 Sys.setenv("GCC_INCLUDE" = "/opt/homebrew/Cellar/gcc/12.2.0/include")
 
 
-install.packages("betapart", type = "source",
-                 configure.args = c("--with-gmp-include=GMP_INCLUDE", "--with-gmp-libs=GMP_LIBS", 
-                                    "--with-gcc-include=GCC_INCLUDE", "--with-gcc-libs=GCC_LIBS"))
-
-
-
+install.packages("gmp", type = "source",
+                 configure.args = c("--with-gmp-include=/opt/homebrew/Cellar/gmp/6.2.1_1/include"
+                                    , "--with-gmp-libs=/opt/homebrew/Cellar/gmp/6.2.1_1/lib" 
+                                    #, "--with-gcc-include=GCC_INCLUDE", "--with-gcc-libs=GCC_LIBS"
+                                    ))
 
 install.packages("vegan")
 library(betapart)
 library(vegan)
+
+
+

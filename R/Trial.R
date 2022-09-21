@@ -183,3 +183,5 @@ tmap_save(map, "Gadus morhua.png", asp=0)
 # save as PDF
 filename <- "./Figure_X.pdf"
 ggsave(plot = map, filename = filename, width = 10, height = 10)
+
+
