@@ -185,3 +185,16 @@ filename <- "./Figure_X.pdf"
 ggsave(plot = map, filename = filename, width = 10, height = 10)
 
 
+#Maping alpha diversity
+#realization that am missing abundance so alpha diversity may not work?
+library(microbiome)
+library(ggpubr)
+library(knitr)
+library(dplyr)
+library(BAT)
+
+data(dietswap)
+pseq <- dietswap
+ps1 <- prune_taxa(taxa_sums(pseq) > 0, pseq)
+tab <- microbiome::alpha(ps1, index = "all")
+kable(head(tab))
